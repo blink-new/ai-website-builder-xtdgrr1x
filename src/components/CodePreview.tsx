@@ -40,9 +40,12 @@ export function CodePreview({
     if (!code) return
 
     try {
+      // Sanitize component name to ensure it's a valid JavaScript identifier
+      const sanitizedComponentName = componentName.replace(/[^a-zA-Z0-9_$]/g, '').replace(/^[0-9]/, '_$&') || 'GeneratedComponent'
+      
       // Validate and clean the code first
       const cleanedCode = code
-        .replace(/import.*from.*['\"].*['\"];?\n?/g, '') // Remove imports
+        .replace(/import.*from.*['"].*['"];?\n?/g, '') // Remove imports
         .replace(/export\s+default\s+function/g, 'function') // Remove export
         .replace(/export\s+function/g, 'function') // Remove export from named functions
         .trim()
@@ -72,7 +75,7 @@ export function CodePreview({
 
           // Mock UI components with better styling
           const mockComponents = {
-            Button: ({ children, className = '', onClick, variant = 'default', ...props }) => {
+            Button: ({ children, className = '', onClick, variant = 'default', ...props }: any) => {
               const baseClasses = 'px-4 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2'
               const variantClasses = variant === 'outline' 
                 ? 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-blue-500'
@@ -84,27 +87,27 @@ export function CodePreview({
               }, children)
             },
             
-            Card: ({ children, className = '' }) => 
+            Card: ({ children, className = '' }: any) => 
               React.createElement('div', { 
                 className: `bg-white border border-gray-200 rounded-lg shadow-sm ${className}`
               }, children),
               
-            CardContent: ({ children, className = '' }) => 
+            CardContent: ({ children, className = '' }: any) => 
               React.createElement('div', { className: `p-6 ${className}` }, children),
               
-            CardHeader: ({ children, className = '' }) => 
+            CardHeader: ({ children, className = '' }: any) => 
               React.createElement('div', { className: `p-6 pb-3 ${className}` }, children),
               
-            CardTitle: ({ children, className = '' }) => 
+            CardTitle: ({ children, className = '' }: any) => 
               React.createElement('h3', { className: `text-lg font-semibold text-gray-900 ${className}` }, children),
               
-            Input: ({ className = '', ...props }) => 
+            Input: ({ className = '', ...props }: any) => 
               React.createElement('input', { 
                 className: `w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${className}`,
                 ...props
               }),
               
-            Badge: ({ children, className = '', variant = 'default' }) => {
+            Badge: ({ children, className = '', variant = 'default' }: any) => {
               const variantClasses = variant === 'secondary' 
                 ? 'bg-gray-100 text-gray-800'
                 : 'bg-blue-100 text-blue-800'
@@ -152,25 +155,51 @@ export function CodePreview({
             ...mockIcons
           }
 
-          // Use Function constructor instead of eval for better error handling
-          const componentFunction = new Function(
-            ...Object.keys(executionContext),
-            `
-            try {
-              ${cleanedCode}
-              if (typeof ${componentName} === 'function') {
-                return ${componentName};
-              } else {
-                throw new Error('Component function not found: ${componentName}');
+          // Create a more robust component finder
+          const findComponentFunction = (context: any, code: string) => {
+            // Execute the code in the context
+            const contextKeys = Object.keys(context)
+            const contextValues = Object.values(context)
+            
+            const wrappedCode = `
+              ${code}
+              
+              // Return the component function
+              const possibleNames = ['${sanitizedComponentName}', 'default', 'Component', 'App'];
+              for (const name of possibleNames) {
+                try {
+                  if (typeof window !== 'undefined' && window[name] && typeof window[name] === 'function') {
+                    return window[name];
+                  }
+                  if (typeof eval(name) === 'function') {
+                    return eval(name);
+                  }
+                } catch (e) {
+                  // Continue to next name
+                }
               }
-            } catch (error) {
-              console.error('Component execution error:', error);
-              throw error;
-            }
+              
+              // If no named function found, try to find any function in the code
+              const functionMatch = code.match(/function\\s+(\\w+)/);
+              if (functionMatch) {
+                const funcName = functionMatch[1];
+                try {
+                  if (typeof eval(funcName) === 'function') {
+                    return eval(funcName);
+                  }
+                } catch (e) {
+                  // Continue
+                }
+              }
+              
+              throw new Error('No valid component function found');
             `
-          )
+            
+            const func = new Function(...contextKeys, wrappedCode)
+            return func(...contextValues)
+          }
 
-          return componentFunction(...Object.values(executionContext))
+          return findComponentFunction(executionContext, cleanedCode)
         } catch (error) {
           console.error('Safe component creation error:', error)
           throw error
