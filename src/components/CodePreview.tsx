@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Card } from './ui/card'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
@@ -12,7 +12,8 @@ import {
   Download, 
   RefreshCw,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Sparkles
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -32,190 +33,6 @@ export function CodePreview({
   onRegenerate 
 }: CodePreviewProps) {
   const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview')
-  const [PreviewComponent, setPreviewComponent] = useState<React.ComponentType | null>(null)
-  const [previewError, setPreviewError] = useState<string | null>(null)
-
-  // Safely render the generated component
-  useEffect(() => {
-    if (!code) return
-
-    try {
-      // Sanitize component name to ensure it's a valid JavaScript identifier
-      const sanitizedComponentName = componentName.replace(/[^a-zA-Z0-9_$]/g, '').replace(/^[0-9]/, '_$&') || 'GeneratedComponent'
-      
-      // Validate and clean the code first
-      const cleanedCode = code
-        .replace(/import.*from.*['"].*['"];?\n?/g, '') // Remove imports
-        .replace(/export\s+default\s+function/g, 'function') // Remove export
-        .replace(/export\s+function/g, 'function') // Remove export from named functions
-        .trim()
-
-      // Check for potential reserved word issues
-      const reservedWords = ['class', 'interface', 'package', 'private', 'protected', 'public', 'static', 'implements', 'extends']
-      const hasReservedWordIssue = reservedWords.some(word => {
-        const regex = new RegExp(`\\b${word}\\s*=`, 'g')
-        return regex.test(cleanedCode)
-      })
-
-      if (hasReservedWordIssue) {
-        throw new Error('Code contains reserved word usage that may cause syntax errors')
-      }
-
-      // Create a safer component wrapper with better error handling
-      const createSafeComponent = () => {
-        try {
-          // Create mock components and hooks
-          const mockReact = {
-            createElement: React.createElement,
-            useState: React.useState,
-            useEffect: React.useEffect,
-            useRef: React.useRef,
-            Fragment: React.Fragment
-          }
-
-          // Mock UI components with better styling
-          const mockComponents = {
-            Button: ({ children, className = '', onClick, variant = 'default', ...props }: any) => {
-              const baseClasses = 'px-4 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2'
-              const variantClasses = variant === 'outline' 
-                ? 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-blue-500'
-                : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500'
-              return React.createElement('button', { 
-                className: `${baseClasses} ${variantClasses} ${className}`,
-                onClick,
-                ...props
-              }, children)
-            },
-            
-            Card: ({ children, className = '' }: any) => 
-              React.createElement('div', { 
-                className: `bg-white border border-gray-200 rounded-lg shadow-sm ${className}`
-              }, children),
-              
-            CardContent: ({ children, className = '' }: any) => 
-              React.createElement('div', { className: `p-6 ${className}` }, children),
-              
-            CardHeader: ({ children, className = '' }: any) => 
-              React.createElement('div', { className: `p-6 pb-3 ${className}` }, children),
-              
-            CardTitle: ({ children, className = '' }: any) => 
-              React.createElement('h3', { className: `text-lg font-semibold text-gray-900 ${className}` }, children),
-              
-            Input: ({ className = '', ...props }: any) => 
-              React.createElement('input', { 
-                className: `w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${className}`,
-                ...props
-              }),
-              
-            Badge: ({ children, className = '', variant = 'default' }: any) => {
-              const variantClasses = variant === 'secondary' 
-                ? 'bg-gray-100 text-gray-800'
-                : 'bg-blue-100 text-blue-800'
-              return React.createElement('span', { 
-                className: `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${variantClasses} ${className}`
-              }, children)
-            }
-          }
-
-          // Mock Lucide icons
-          const mockIcons = {
-            ChevronRight: () => React.createElement('svg', { 
-              width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2,
-              className: 'lucide lucide-chevron-right'
-            }, React.createElement('polyline', { points: '9,18 15,12 9,6' })),
-            
-            Star: () => React.createElement('svg', { 
-              width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2,
-              className: 'lucide lucide-star'
-            }, React.createElement('polygon', { points: '12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26' })),
-            
-            Heart: () => React.createElement('svg', { 
-              width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2,
-              className: 'lucide lucide-heart'
-            }, React.createElement('path', { d: 'm19,14c0,5-7,9-7,9s-7-4-7-9a5,5,0,0,1,10,0l4,0a5,5,0,0,1,0,0z' })),
-            
-            User: () => React.createElement('svg', { 
-              width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2,
-              className: 'lucide lucide-user'
-            }, React.createElement('path', { d: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2' }), React.createElement('circle', { cx: '12', cy: '7', r: '4' })),
-            
-            Mail: () => React.createElement('svg', { 
-              width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2,
-              className: 'lucide lucide-mail'
-            }, React.createElement('rect', { width: '20', height: '16', x: '2', y: '4', rx: '2' }), React.createElement('path', { d: 'm22,7-10,5L2,7' }))
-          }
-
-          // Create a safe execution context
-          const executionContext = {
-            React: mockReact,
-            useState: mockReact.useState,
-            useEffect: mockReact.useEffect,
-            useRef: mockReact.useRef,
-            ...mockComponents,
-            ...mockIcons
-          }
-
-          // Create a more robust component finder
-          const findComponentFunction = (context: any, code: string) => {
-            // Execute the code in the context
-            const contextKeys = Object.keys(context)
-            const contextValues = Object.values(context)
-            
-            const wrappedCode = `
-              ${code}
-              
-              // Return the component function
-              const possibleNames = ['${sanitizedComponentName}', 'default', 'Component', 'App'];
-              for (const name of possibleNames) {
-                try {
-                  if (typeof window !== 'undefined' && window[name] && typeof window[name] === 'function') {
-                    return window[name];
-                  }
-                  if (typeof eval(name) === 'function') {
-                    return eval(name);
-                  }
-                } catch (e) {
-                  // Continue to next name
-                }
-              }
-              
-              // If no named function found, try to find any function in the code
-              const functionMatch = code.match(/function\\s+(\\w+)/);
-              if (functionMatch) {
-                const funcName = functionMatch[1];
-                try {
-                  if (typeof eval(funcName) === 'function') {
-                    return eval(funcName);
-                  }
-                } catch (e) {
-                  // Continue
-                }
-              }
-              
-              throw new Error('No valid component function found');
-            `
-            
-            const func = new Function(...contextKeys, wrappedCode)
-            return func(...contextValues)
-          }
-
-          return findComponentFunction(executionContext, cleanedCode)
-        } catch (error) {
-          console.error('Safe component creation error:', error)
-          throw error
-        }
-      }
-
-      const ComponentClass = createSafeComponent()
-      setPreviewComponent(() => ComponentClass)
-      setPreviewError(null)
-    } catch (error) {
-      console.error('Preview error:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Failed to render preview'
-      setPreviewError(errorMessage)
-      setPreviewComponent(null)
-    }
-  }, [code, componentName])
 
   const copyToClipboard = async () => {
     try {
@@ -237,6 +54,127 @@ export function CodePreview({
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
     toast.success('Code downloaded!')
+  }
+
+  // Create a safe static preview based on the code content
+  const createStaticPreview = () => {
+    if (!code) return null
+
+    // Analyze the code to determine what kind of component it is
+    const hasForm = /input|form|button/i.test(code)
+    const hasCard = /card/i.test(code)
+    const hasNavigation = /nav|menu|header/i.test(code)
+    const hasGrid = /grid|flex/i.test(code)
+    const hasChart = /chart|graph/i.test(code)
+    const hasList = /list|item/i.test(code)
+
+    return (
+      <div className="space-y-6 p-6">
+        <div className="text-center space-y-2">
+          <div className="inline-flex items-center space-x-2 bg-primary/10 text-primary px-3 py-1 rounded-full text-sm">
+            <Sparkles className="h-4 w-4" />
+            <span>AI Generated Component</span>
+          </div>
+          <h3 className="text-lg font-semibold">{componentName}</h3>
+          <p className="text-muted-foreground text-sm max-w-md mx-auto">{preview}</p>
+        </div>
+
+        {/* Static preview based on code analysis */}
+        <div className="border-2 border-dashed border-muted-foreground/20 rounded-lg p-8 bg-muted/5">
+          <div className="text-center space-y-4">
+            {hasForm && (
+              <div className="space-y-3 max-w-sm mx-auto">
+                <div className="h-10 bg-muted rounded border"></div>
+                <div className="h-10 bg-muted rounded border"></div>
+                <div className="h-10 bg-primary/20 rounded"></div>
+              </div>
+            )}
+            
+            {hasCard && !hasForm && (
+              <div className="grid gap-4 max-w-2xl mx-auto">
+                <div className="bg-background border rounded-lg p-4 space-y-2">
+                  <div className="h-4 bg-muted rounded w-3/4"></div>
+                  <div className="h-3 bg-muted/60 rounded w-1/2"></div>
+                  <div className="h-3 bg-muted/60 rounded w-2/3"></div>
+                </div>
+              </div>
+            )}
+            
+            {hasNavigation && (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center p-4 bg-background border rounded">
+                  <div className="h-6 bg-muted rounded w-24"></div>
+                  <div className="flex space-x-2">
+                    <div className="h-6 bg-muted rounded w-16"></div>
+                    <div className="h-6 bg-muted rounded w-16"></div>
+                    <div className="h-6 bg-primary/20 rounded w-16"></div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {hasGrid && !hasCard && !hasForm && !hasNavigation && (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-lg mx-auto">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="aspect-square bg-muted rounded"></div>
+                ))}
+              </div>
+            )}
+            
+            {hasList && !hasGrid && !hasCard && (
+              <div className="space-y-2 max-w-md mx-auto">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="flex items-center space-x-3 p-3 bg-background border rounded">
+                    <div className="w-8 h-8 bg-muted rounded-full"></div>
+                    <div className="flex-1 space-y-1">
+                      <div className="h-3 bg-muted rounded w-3/4"></div>
+                      <div className="h-2 bg-muted/60 rounded w-1/2"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {hasChart && (
+              <div className="max-w-md mx-auto">
+                <div className="h-48 bg-gradient-to-t from-primary/20 to-transparent rounded border flex items-end justify-around p-4">
+                  {[40, 60, 30, 80, 50].map((height, i) => (
+                    <div key={i} className="bg-primary/60 rounded-t" style={{ height: `${height}%`, width: '20px' }}></div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {!hasForm && !hasCard && !hasNavigation && !hasGrid && !hasList && !hasChart && (
+              <div className="space-y-4">
+                <div className="w-16 h-16 bg-primary/20 rounded-full mx-auto flex items-center justify-center">
+                  <Code className="h-8 w-8 text-primary" />
+                </div>
+                <div className="space-y-2">
+                  <div className="h-4 bg-muted rounded w-48 mx-auto"></div>
+                  <div className="h-3 bg-muted/60 rounded w-32 mx-auto"></div>
+                </div>
+              </div>
+            )}
+            
+            <div className="pt-4 border-t border-dashed">
+              <p className="text-xs text-muted-foreground">
+                This is a static preview. The actual component will be fully interactive when exported.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="text-center">
+          <Alert>
+            <CheckCircle className="h-4 w-4" />
+            <AlertDescription>
+              Component generated successfully! Switch to the Code tab to view the implementation.
+            </AlertDescription>
+          </Alert>
+        </div>
+      </div>
+    )
   }
 
   if (isGenerating) {
@@ -312,32 +250,11 @@ export function CodePreview({
 
       <div className="flex-1">
         <Tabs value={activeTab} className="h-full">
-          <TabsContent value="preview" className="h-full mt-0 p-4">
+          <TabsContent value="preview" className="h-full mt-0">
             <Card className="h-full">
-              <div className="p-4 border-b">
-                <p className="text-sm text-muted-foreground">{preview}</p>
-              </div>
-              <div className="p-6 h-full overflow-auto">
-                {previewError ? (
-                  <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      Preview Error: {previewError}
-                    </AlertDescription>
-                  </Alert>
-                ) : PreviewComponent ? (
-                  <div className="min-h-full">
-                    <PreviewComponent />
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground">
-                    <div className="text-center">
-                      <Eye className="h-8 w-8 mx-auto mb-2" />
-                      <p>Loading preview...</p>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <ScrollArea className="h-full">
+                {createStaticPreview()}
+              </ScrollArea>
             </Card>
           </TabsContent>
           

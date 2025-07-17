@@ -22,10 +22,12 @@ IMPORTANT RULES:
 4. Make components responsive and accessible
 5. Include proper error handling and loading states
 6. Use modern React patterns (hooks, functional components)
-7. Return ONLY the component code, no explanations
+7. Return ONLY the component code wrapped in \`\`\`tsx code blocks
 8. Component should be a default export
 9. Use shadcn/ui components when appropriate (Button, Card, Input, etc.)
 10. Make it production-ready and beautiful
+11. Always wrap the entire component code in \`\`\`tsx and \`\`\` tags
+12. Use safe, standard React patterns - avoid complex dynamic rendering
 
 Available shadcn/ui components: Button, Card, Input, Badge, Tabs, ScrollArea, Separator, Dialog, Sheet, Toast, and more.
 
@@ -62,9 +64,36 @@ Generate a React component that fulfills this request. Make it modern, responsiv
         maxTokens: 2000
       })
 
-      // Extract code from response
+      // Extract code from response with better error handling
+      let code = ''
       const codeMatch = text.match(/```(?:tsx?|javascript|jsx)?\n([\s\S]*?)\n```/)
-      const code = codeMatch ? codeMatch[1] : text
+      
+      if (codeMatch) {
+        code = codeMatch[1]
+      } else {
+        // Fallback: try to find code without proper markdown formatting
+        const fallbackMatch = text.match(/import.*React.*[\s\S]*export default function/m)
+        if (fallbackMatch) {
+          code = text
+        } else {
+          // Last resort: create a simple component wrapper
+          code = `import React from 'react'
+
+export default function GeneratedComponent() {
+  return (
+    <div className="p-6 text-center">
+      <h2 className="text-xl font-semibold mb-2">Generated Component</h2>
+      <p className="text-muted-foreground">
+        The AI generated content that couldn't be properly formatted as a React component.
+      </p>
+      <div className="mt-4 p-4 bg-muted rounded-lg">
+        <pre className="text-sm">{${JSON.stringify(text.slice(0, 200))}}</pre>
+      </div>
+    </div>
+  )
+}`
+        }
+      }
 
       // Extract component name from code
       const componentNameMatch = code.match(/export default function (\w+)/)
