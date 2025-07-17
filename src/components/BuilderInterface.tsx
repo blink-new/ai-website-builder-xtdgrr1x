@@ -4,6 +4,7 @@ import { Input } from './ui/input'
 import { ScrollArea } from './ui/scroll-area'
 import { Separator } from './ui/separator'
 import { CodePreview } from './CodePreview'
+import { ErrorBoundary } from './ErrorBoundary'
 import { CodeGeneratorService } from '../services/codeGenerator'
 import type { Message, GeneratedComponent } from '../types/app'
 import { 
@@ -238,13 +239,15 @@ export function BuilderInterface({ initialPrompt, onBackToLanding }: BuilderInte
 
         {/* Preview/Code Panel */}
         <div className="flex-1 flex flex-col">
-          <CodePreview
-            code={currentComponent?.code || ''}
-            componentName={currentComponent?.name || 'Component'}
-            preview={currentComponent?.preview || 'No component generated yet'}
-            isGenerating={isGenerating}
-            onRegenerate={handleRegenerateComponent}
-          />
+          <ErrorBoundary>
+            <CodePreview
+              code={currentComponent?.code || ''}
+              componentName={currentComponent?.name || 'Component'}
+              preview={currentComponent?.preview || 'No component generated yet'}
+              isGenerating={isGenerating}
+              onRegenerate={handleRegenerateComponent}
+            />
+          </ErrorBoundary>
         </div>
       </div>
     </div>

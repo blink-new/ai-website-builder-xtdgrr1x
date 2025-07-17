@@ -40,76 +40,150 @@ export function CodePreview({
     if (!code) return
 
     try {
-      // Create a safe evaluation environment
-      const componentCode = code
-        .replace(/import.*from.*['"].*['"];?\n?/g, '') // Remove imports
-        .replace(/export default function/g, 'function') // Remove export
-      
-      // Create a simple component wrapper
-      const wrappedCode = `
-        (function() {
-          const React = window.React;
-          const { useState, useEffect, useRef } = React;
-          
-          // Mock UI components
-          const Button = ({ children, className = '', onClick, ...props }) => 
-            React.createElement('button', { 
-              className: \`px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 \${className}\`,
-              onClick,
-              ...props
-            }, children);
+      // Validate and clean the code first
+      const cleanedCode = code
+        .replace(/import.*from.*['\"].*['\"];?\n?/g, '') // Remove imports
+        .replace(/export\s+default\s+function/g, 'function') // Remove export
+        .replace(/export\s+function/g, 'function') // Remove export from named functions
+        .trim()
+
+      // Check for potential reserved word issues
+      const reservedWords = ['class', 'interface', 'package', 'private', 'protected', 'public', 'static', 'implements', 'extends']
+      const hasReservedWordIssue = reservedWords.some(word => {
+        const regex = new RegExp(`\\b${word}\\s*=`, 'g')
+        return regex.test(cleanedCode)
+      })
+
+      if (hasReservedWordIssue) {
+        throw new Error('Code contains reserved word usage that may cause syntax errors')
+      }
+
+      // Create a safer component wrapper with better error handling
+      const createSafeComponent = () => {
+        try {
+          // Create mock components and hooks
+          const mockReact = {
+            createElement: React.createElement,
+            useState: React.useState,
+            useEffect: React.useEffect,
+            useRef: React.useRef,
+            Fragment: React.Fragment
+          }
+
+          // Mock UI components with better styling
+          const mockComponents = {
+            Button: ({ children, className = '', onClick, variant = 'default', ...props }) => {
+              const baseClasses = 'px-4 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2'
+              const variantClasses = variant === 'outline' 
+                ? 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-blue-500'
+                : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500'
+              return React.createElement('button', { 
+                className: `${baseClasses} ${variantClasses} ${className}`,
+                onClick,
+                ...props
+              }, children)
+            },
             
-          const Card = ({ children, className = '' }) => 
-            React.createElement('div', { 
-              className: \`bg-white border rounded-lg shadow-sm \${className}\`
-            }, children);
-            
-          const CardContent = ({ children, className = '' }) => 
-            React.createElement('div', { className: \`p-6 \${className}\` }, children);
-            
-          const CardHeader = ({ children, className = '' }) => 
-            React.createElement('div', { className: \`p-6 pb-0 \${className}\` }, children);
-            
-          const CardTitle = ({ children, className = '' }) => 
-            React.createElement('h3', { className: \`text-lg font-semibold \${className}\` }, children);
-            
-          const Input = ({ className = '', ...props }) => 
-            React.createElement('input', { 
-              className: \`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 \${className}\`,
-              ...props
-            });
-            
-          const Badge = ({ children, className = '' }) => 
-            React.createElement('span', { 
-              className: \`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 \${className}\`
-            }, children);
+            Card: ({ children, className = '' }) => 
+              React.createElement('div', { 
+                className: `bg-white border border-gray-200 rounded-lg shadow-sm ${className}`
+              }, children),
+              
+            CardContent: ({ children, className = '' }) => 
+              React.createElement('div', { className: `p-6 ${className}` }, children),
+              
+            CardHeader: ({ children, className = '' }) => 
+              React.createElement('div', { className: `p-6 pb-3 ${className}` }, children),
+              
+            CardTitle: ({ children, className = '' }) => 
+              React.createElement('h3', { className: `text-lg font-semibold text-gray-900 ${className}` }, children),
+              
+            Input: ({ className = '', ...props }) => 
+              React.createElement('input', { 
+                className: `w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${className}`,
+                ...props
+              }),
+              
+            Badge: ({ children, className = '', variant = 'default' }) => {
+              const variantClasses = variant === 'secondary' 
+                ? 'bg-gray-100 text-gray-800'
+                : 'bg-blue-100 text-blue-800'
+              return React.createElement('span', { 
+                className: `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${variantClasses} ${className}`
+              }, children)
+            }
+          }
 
           // Mock Lucide icons
-          const ChevronRight = () => React.createElement('svg', { 
-            width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2 
-          }, React.createElement('polyline', { points: '9,18 15,12 9,6' }));
-          
-          const Star = () => React.createElement('svg', { 
-            width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2 
-          }, React.createElement('polygon', { points: '12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26' }));
-          
-          const Heart = () => React.createElement('svg', { 
-            width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2 
-          }, React.createElement('path', { d: 'm19,14c0,5-7,9-7,9s-7-4-7-9a5,5,0,0,1,10,0l4,0a5,5,0,0,1,0,0z' }));
+          const mockIcons = {
+            ChevronRight: () => React.createElement('svg', { 
+              width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2,
+              className: 'lucide lucide-chevron-right'
+            }, React.createElement('polyline', { points: '9,18 15,12 9,6' })),
+            
+            Star: () => React.createElement('svg', { 
+              width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2,
+              className: 'lucide lucide-star'
+            }, React.createElement('polygon', { points: '12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26' })),
+            
+            Heart: () => React.createElement('svg', { 
+              width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2,
+              className: 'lucide lucide-heart'
+            }, React.createElement('path', { d: 'm19,14c0,5-7,9-7,9s-7-4-7-9a5,5,0,0,1,10,0l4,0a5,5,0,0,1,0,0z' })),
+            
+            User: () => React.createElement('svg', { 
+              width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2,
+              className: 'lucide lucide-user'
+            }, React.createElement('path', { d: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2' }), React.createElement('circle', { cx: '12', cy: '7', r: '4' })),
+            
+            Mail: () => React.createElement('svg', { 
+              width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2,
+              className: 'lucide lucide-mail'
+            }, React.createElement('rect', { width: '20', height: '16', x: '2', y: '4', rx: '2' }), React.createElement('path', { d: 'm22,7-10,5L2,7' }))
+          }
 
-          ${componentCode}
-          
-          return ${componentName};
-        })()
-      `
+          // Create a safe execution context
+          const executionContext = {
+            React: mockReact,
+            useState: mockReact.useState,
+            useEffect: mockReact.useEffect,
+            useRef: mockReact.useRef,
+            ...mockComponents,
+            ...mockIcons
+          }
 
-      // Safely evaluate the component
-      const ComponentClass = eval(wrappedCode)
+          // Use Function constructor instead of eval for better error handling
+          const componentFunction = new Function(
+            ...Object.keys(executionContext),
+            `
+            try {
+              ${cleanedCode}
+              if (typeof ${componentName} === 'function') {
+                return ${componentName};
+              } else {
+                throw new Error('Component function not found: ${componentName}');
+              }
+            } catch (error) {
+              console.error('Component execution error:', error);
+              throw error;
+            }
+            `
+          )
+
+          return componentFunction(...Object.values(executionContext))
+        } catch (error) {
+          console.error('Safe component creation error:', error)
+          throw error
+        }
+      }
+
+      const ComponentClass = createSafeComponent()
       setPreviewComponent(() => ComponentClass)
       setPreviewError(null)
     } catch (error) {
       console.error('Preview error:', error)
-      setPreviewError(error instanceof Error ? error.message : 'Failed to render preview')
+      const errorMessage = error instanceof Error ? error.message : 'Failed to render preview'
+      setPreviewError(errorMessage)
       setPreviewComponent(null)
     }
   }, [code, componentName])

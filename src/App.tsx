@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Toaster } from 'sonner'
 import { LandingPage } from './components/LandingPage'
 import { BuilderInterface } from './components/BuilderInterface'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { blink } from './blink/client'
 
 function App() {
@@ -63,17 +64,19 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {currentView === 'landing' ? (
-        <LandingPage onStartBuilding={handleStartBuilding} />
-      ) : (
-        <BuilderInterface 
-          initialPrompt={currentProject || ''} 
-          onBackToLanding={handleBackToLanding}
-        />
-      )}
-      <Toaster position="top-right" />
-    </div>
+    <ErrorBoundary>
+      <div className="min-h-screen bg-background">
+        {currentView === 'landing' ? (
+          <LandingPage onStartBuilding={handleStartBuilding} />
+        ) : (
+          <BuilderInterface 
+            initialPrompt={currentProject || ''} 
+            onBackToLanding={handleBackToLanding}
+          />
+        )}
+        <Toaster position="top-right" />
+      </div>
+    </ErrorBoundary>
   )
 }
 
