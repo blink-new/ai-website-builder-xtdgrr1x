@@ -46,13 +46,6 @@ export function BuilderInterface({ initialPrompt, onBackToLanding }: BuilderInte
     scrollToBottom()
   }, [messages])
 
-  // Generate initial component on mount
-  useEffect(() => {
-    if (initialPrompt && !currentComponent) {
-      generateComponent(initialPrompt, true)
-    }
-  }, [initialPrompt, currentComponent, generateComponent])
-
   const generateComponent = useCallback(async (prompt: string, isInitial = false) => {
     setIsGenerating(true)
     
@@ -102,6 +95,13 @@ export function BuilderInterface({ initialPrompt, onBackToLanding }: BuilderInte
       setIsGenerating(false)
     }
   }, [codeGenerator, currentComponent])
+
+  // Generate initial component on mount
+  useEffect(() => {
+    if (initialPrompt && !currentComponent) {
+      generateComponent(initialPrompt, true)
+    }
+  }, [initialPrompt, currentComponent, generateComponent])
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
