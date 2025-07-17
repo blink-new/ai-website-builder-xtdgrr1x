@@ -1,17 +1,14 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
-import { Card } from './ui/card'
-import { Badge } from './ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import { ScrollArea } from './ui/scroll-area'
 import { Separator } from './ui/separator'
+import { CodePreview } from './CodePreview'
+import { CodeGeneratorService } from '../services/codeGenerator'
+import type { Message, GeneratedComponent } from '../types/app'
 import { 
   ArrowLeft, 
   Send, 
-  Smartphone, 
-  Monitor, 
-  Code, 
   Download, 
   Share, 
   Sparkles,
@@ -25,13 +22,6 @@ interface BuilderInterfaceProps {
   onBackToLanding: () => void
 }
 
-interface Message {
-  id: string
-  type: 'user' | 'ai'
-  content: string
-  timestamp: Date
-}
-
 export function BuilderInterface({ initialPrompt, onBackToLanding }: BuilderInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -39,18 +29,13 @@ export function BuilderInterface({ initialPrompt, onBackToLanding }: BuilderInte
       type: 'user',
       content: initialPrompt,
       timestamp: new Date()
-    },
-    {
-      id: '2',
-      type: 'ai',
-      content: "I'll help you build that web application! Let me start by creating the basic structure and components. This will include a modern design with responsive layout, interactive elements, and clean code architecture.",
-      timestamp: new Date()
     }
   ])
   const [currentMessage, setCurrentMessage] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
-  const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop')
-  const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview')
+
+  const [currentComponent, setCurrentComponent] = useState<GeneratedComponent | null>(null)
+  const [codeGenerator] = useState(() => CodeGeneratorService.getInstance())
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
@@ -60,6 +45,63 @@ export function BuilderInterface({ initialPrompt, onBackToLanding }: BuilderInte
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Generate initial component on mount
+  useEffect(() => {
+    if (initialPrompt && !currentComponent) {
+      generateComponent(initialPrompt, true)
+    }
+  }, [initialPrompt, currentComponent, generateComponent])
+
+  const generateComponent = useCallback(async (prompt: string, isInitial = false) => {
+    setIsGenerating(true)
+    
+    try {
+      const response = await codeGenerator.generateComponent({
+        prompt,
+        existingCode: currentComponent?.code,
+        context: isInitial ? 'This is the initial component generation for a new project.' : undefined
+      })
+
+      if (response.success) {
+        const newComponent: GeneratedComponent = {
+          id: Date.now().toString(),
+          name: response.componentName,
+          code: response.code,
+          preview: response.preview,
+          timestamp: new Date()
+        }
+        
+        setCurrentComponent(newComponent)
+        
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          type: 'ai',
+          content: `I've generated a ${response.componentName} component for you! ${response.preview}`,
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, aiMessage])
+      } else {
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          type: 'ai',
+          content: `I encountered an error while generating the component: ${response.error}. Please try rephrasing your request.`,
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, errorMessage])
+      }
+    } catch (error) {
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        type: 'ai',
+        content: 'I encountered an unexpected error. Please try again.',
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, errorMessage])
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [codeGenerator, currentComponent])
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -73,49 +115,17 @@ export function BuilderInterface({ initialPrompt, onBackToLanding }: BuilderInte
     }
 
     setMessages(prev => [...prev, userMessage])
+    const messageToProcess = currentMessage
     setCurrentMessage('')
-    setIsGenerating(true)
 
-    // Simulate AI response
-    setTimeout(() => {
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'ai',
-        content: "I understand your request. I'm updating the application with those changes. The new features will include improved styling, better user experience, and additional functionality as requested.",
-        timestamp: new Date()
-      }
-      setMessages(prev => [...prev, aiMessage])
-      setIsGenerating(false)
-    }, 2000)
+    await generateComponent(messageToProcess)
   }
 
-  const sampleCode = `import React, { useState } from 'react'
-import { Button } from './components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
-
-export default function App() {
-  const [count, setCount] = useState(0)
-
-  return (
-    <div className="min-h-screen bg-background p-8">
-      <div className="max-w-4xl mx-auto">
-        <Card>
-          <CardHeader>
-            <CardTitle>Welcome to Your App</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <p>Count: {count}</p>
-              <Button onClick={() => setCount(count + 1)}>
-                Increment
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  )
-}`
+  const handleRegenerateComponent = () => {
+    if (currentComponent) {
+      generateComponent('Regenerate this component with improvements and better design')
+    }
+  }
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -228,110 +238,13 @@ export default function App() {
 
         {/* Preview/Code Panel */}
         <div className="flex-1 flex flex-col">
-          <div className="border-b p-4">
-            <div className="flex items-center justify-between">
-              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'preview' | 'code')}>
-                <TabsList>
-                  <TabsTrigger value="preview">Preview</TabsTrigger>
-                  <TabsTrigger value="code">Code</TabsTrigger>
-                </TabsList>
-              </Tabs>
-              
-              {activeTab === 'preview' && (
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant={viewMode === 'desktop' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setViewMode('desktop')}
-                  >
-                    <Monitor className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant={viewMode === 'mobile' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setViewMode('mobile')}
-                  >
-                    <Smartphone className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <div className="flex-1 p-4">
-            <Tabs value={activeTab} className="h-full">
-              <TabsContent value="preview" className="h-full mt-0">
-                <div className="h-full flex items-center justify-center bg-muted/20 rounded-lg">
-                  <div className={`bg-background border rounded-lg shadow-lg transition-all duration-300 ${
-                    viewMode === 'mobile' 
-                      ? 'w-80 h-[600px]' 
-                      : 'w-full h-full max-w-6xl'
-                  }`}>
-                    <div className="h-full flex flex-col">
-                      {/* Mock Browser Header */}
-                      <div className="flex items-center space-x-2 p-3 border-b bg-muted/50">
-                        <div className="flex space-x-1">
-                          <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                          <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                          <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                        </div>
-                        <div className="flex-1 bg-background rounded px-3 py-1 text-sm text-muted-foreground">
-                          localhost:3000
-                        </div>
-                      </div>
-                      
-                      {/* App Preview */}
-                      <div className="flex-1 p-8 overflow-auto">
-                        <div className="max-w-4xl mx-auto">
-                          <Card>
-                            <div className="p-6">
-                              <h1 className="text-2xl font-bold mb-4">Welcome to Your App</h1>
-                              <p className="text-muted-foreground mb-6">
-                                This is a preview of your generated web application. 
-                                You can interact with the AI to modify and enhance it.
-                              </p>
-                              <div className="space-y-4">
-                                <Button className="w-full sm:w-auto">
-                                  Get Started
-                                </Button>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
-                                  {[1, 2, 3].map((i) => (
-                                    <Card key={i} className="p-4">
-                                      <h3 className="font-semibold mb-2">Feature {i}</h3>
-                                      <p className="text-sm text-muted-foreground">
-                                        Description of feature {i}
-                                      </p>
-                                    </Card>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          </Card>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="code" className="h-full mt-0">
-                <Card className="h-full">
-                  <div className="p-4 border-b flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Code className="h-4 w-4" />
-                      <span className="font-medium">App.tsx</span>
-                    </div>
-                    <Badge variant="secondary">React + TypeScript</Badge>
-                  </div>
-                  <ScrollArea className="h-full">
-                    <pre className="p-4 text-sm font-mono bg-muted/20 h-full overflow-auto">
-                      <code>{sampleCode}</code>
-                    </pre>
-                  </ScrollArea>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </div>
+          <CodePreview
+            code={currentComponent?.code || ''}
+            componentName={currentComponent?.name || 'Component'}
+            preview={currentComponent?.preview || 'No component generated yet'}
+            isGenerating={isGenerating}
+            onRegenerate={handleRegenerateComponent}
+          />
         </div>
       </div>
     </div>
